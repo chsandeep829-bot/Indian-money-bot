@@ -69,9 +69,7 @@ def get_user(telegram_id):
 # --- Real Email Sender Function ---
 def send_otp_email(receiver_email, code):
     try:
-        # Strip any accidental spaces from app password
         clean_password = SENDER_PASSWORD.replace(" ", "")
-        
         msg = MIMEMultipart()
         msg['From'] = SENDER_EMAIL
         msg['To'] = receiver_email
@@ -157,6 +155,40 @@ async def webapp(telegram_id: int = 0):
                 justify-content: center;
                 gap: 10px;
             }}
+            .account-list {{
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                margin-bottom: 12px;
+                max-height: 220px;
+                overflow-y: auto;
+            }}
+            .account-item {{
+                background: #0f172a;
+                border: 1px solid #334155;
+                padding: 10px 14px;
+                border-radius: 8px;
+                cursor: pointer;
+                text-align: left;
+                color: #f8fafc;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }}
+            .account-item:hover {{
+                border-color: #2563eb;
+            }}
+            .avatar {{
+                width: 32px;
+                height: 32px;
+                background: #2563eb;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                color: white;
+            }}
             .hidden {{ display: none; }}
             .balance {{ font-size: 28px; font-weight: bold; color: #22c55e; margin: 10px 0; }}
             .status-badge {{ background: #ef4444; padding: 4px 8px; border-radius: 4px; font-size: 12px; }}
@@ -169,11 +201,38 @@ async def webapp(telegram_id: int = 0):
             <div id="loginView" class="card">
                 <h2>🔐 Secure Login</h2>
                 <p style="color: #94a3b8; font-size: 14px;">Select Google account or enter email</p>
-                <button class="btn-google" onclick="mockGoogleLogin()">
+                
+                <button class="btn-google" onclick="toggleAccountPicker()">
                     <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.13 0-5.78-2.11-6.73-4.96H1.18v3.14C3.15 21.32 7.23 24 12 24z"/><path fill="#FBBC05" d="M5.27 14.24c-.25-.72-.38-1.49-.38-2.24s.13-1.52.38-2.24V6.62H1.18C.43 8.14 0 9.87 0 11.75s.43 3.61 1.18 5.13l4.09-2.64z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.23 0 3.15 2.68 1.18 6.62l4.09 3.14c.95-2.85 3.6-4.96 6.73-4.96z"/></svg>
-                    Continue with Google
+                    Choose Google Account
                 </button>
-                <input type="email" id="emailInput" placeholder="name@gmail.com">
+
+                <!-- Account Selector List -->
+                <div id="accountPicker" class="account-list hidden">
+                    <div class="account-item" onclick="selectAccount('Chsandeep829@gmail.com', 'Sandeep')">
+                        <div class="avatar" style="background:#2563eb;">S</div>
+                        <div>
+                            <div style="font-weight:bold;">Sandeep</div>
+                            <div style="font-size:12px; color:#94a3b8;">Chsandeep829@gmail.com</div>
+                        </div>
+                    </div>
+                    <div class="account-item" onclick="selectAccount('suresh.chintada@gmail.com', 'Suresh Chintada')">
+                        <div class="avatar" style="background:#16a34a;">SC</div>
+                        <div>
+                            <div style="font-weight:bold;">Suresh Chintada</div>
+                            <div style="font-size:12px; color:#94a3b8;">suresh.chintada@gmail.com</div>
+                        </div>
+                    </div>
+                    <div class="account-item" onclick="selectAccount('arunakumari@gmail.com', 'Arunakumari Chintada')">
+                        <div class="avatar" style="background:#d97706;">AC</div>
+                        <div>
+                            <div style="font-weight:bold;">Arunakumari Chintada</div>
+                            <div style="font-size:12px; color:#94a3b8;">arunakumari@gmail.com</div>
+                        </div>
+                    </div>
+                </div>
+
+                <input type="email" id="emailInput" placeholder="name@gmail.com" value="Chsandeep829@gmail.com">
                 <button class="btn-primary" onclick="sendOtp()">Send OTP</button>
             </div>
 
@@ -217,76 +276,98 @@ async def webapp(telegram_id: int = 0):
 
             let currentEmail = "";
 
-            async function loadUserData() {{
-                let res = await fetch(`/api/user?telegram_id=${{telegramId}}`);
-                let data = await res.json();
-                if (data.is_verified) {{
-                    document.getElementById('loginView').classList.add('hidden');
-                    document.getElementById('otpView').classList.add('hidden');
-                    document.getElementById('dashboardView').classList.remove('hidden');
-                    document.getElementById('balanceDisplay').innerText = `₹${{data.balance.toFixed(2)}}`;
-                    document.getElementById('statusBadge').innerText = "Verified";
-                    document.getElementById('statusBadge').className = "verified-badge";
-                    if (data.bank_account) document.getElementById('bankAccInput').value = data.bank_account;
-                    if (data.ifsc) document.getElementById('ifscInput').value = data.ifsc;
-                }}
+            function toggleAccountPicker() {{
+                let picker = document.getElementById('accountPicker');
+                picker.classList.toggle('hidden');
             }}
 
-            function mockGoogleLogin() {{
-                let email = prompt("Enter your Google Account email:", "Chsandeep829@gmail.com");
-                if (email) {{
-                    document.getElementById('emailInput').value = email;
-                    sendOtp();
+            function selectAccount(email, name) {{
+                document.getElementById('emailInput').value = email;
+                document.getElementById('accountPicker').classList.add('hidden');
+            }}
+
+            async function loadUserData() {{
+                try {{
+                    let res = await fetch(`/api/user?telegram_id=${{telegramId}}`);
+                    let data = await res.json();
+                    if (data.is_verified) {{
+                        document.getElementById('loginView').classList.add('hidden');
+                        document.getElementById('otpView').classList.add('hidden');
+                        document.getElementById('dashboardView').classList.remove('hidden');
+                        document.getElementById('balanceDisplay').innerText = `₹${{data.balance.toFixed(2)}}`;
+                        document.getElementById('statusBadge').innerText = "Verified";
+                        document.getElementById('statusBadge').className = "verified-badge";
+                        if (data.bank_account) document.getElementById('bankAccInput').value = data.bank_account;
+                        if (data.ifsc) document.getElementById('ifscInput').value = data.ifsc;
+                    }}
+                }} catch (e) {{
+                    console.error("Error loading user:", e);
                 }}
             }}
 
             async function sendOtp() {{
                 currentEmail = document.getElementById('emailInput').value.trim();
-                if (!currentEmail) {{ alert("Enter valid email"); return; }}
-                let res = await fetch('/api/send-otp', {{
-                    method: 'POST',
-                    headers: {{ 'Content-Type': 'application/json' }},
-                    body: JSON.stringify({{ telegram_id: telegramId, email: currentEmail }})
-                }});
-                let data = await res.json();
-                if (data.success) {{
-                    document.getElementById('loginView').classList.add('hidden');
-                    document.getElementById('otpView').classList.remove('hidden');
-                }} else {{
-                    alert("Failed to send email. Check your SMTP configuration.");
+                if (!currentEmail) {{ alert("Please enter a valid email address"); return; }}
+                
+                try {{
+                    let res = await fetch('/api/send-otp', {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                        body: JSON.stringify({{ telegram_id: telegramId, email: currentEmail }})
+                    }});
+                    let data = await res.json();
+                    if (data.success) {{
+                        document.getElementById('loginView').classList.add('hidden');
+                        document.getElementById('otpView').classList.remove('hidden');
+                    }} else {{
+                        alert("Failed to send OTP email. Check SMTP settings.");
+                    }}
+                }} catch (e) {{
+                    alert("Network error while sending OTP.");
+                    console.error(e);
                 }}
             }}
 
             async function verifyOtp() {{
                 let code = document.getElementById('otpInput').value.trim();
-                let res = await fetch('/api/verify-otp', {{
-                    method: 'POST',
-                    headers: {{ 'Content-Type': 'application/json' }},
-                    body: JSON.stringify({{ telegram_id: telegramId, code: code }})
-                }});
-                let data = await res.json();
-                if (data.success) {{
-                    alert("Verified successfully!");
-                    loadUserData();
-                }} else {{
-                    alert("Invalid confirmation code.");
+                if (!code) {{ alert("Please enter the verification code"); return; }}
+
+                try {{
+                    let res = await fetch('/api/verify-otp', {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                        body: JSON.stringify({{ telegram_id: telegramId, code: code }})
+                    }});
+                    let data = await res.json();
+                    if (data.success) {{
+                        alert("Verified successfully!");
+                        loadUserData();
+                    }} else {{
+                        alert("Invalid confirmation code.");
+                    }}
+                }} catch (e) {{
+                    alert("Network error during verification.");
                 }}
             }}
 
             async function saveBank() {{
                 let bank_account = document.getElementById('bankAccInput').value.trim();
                 let ifsc = document.getElementById('ifscInput').value.trim();
+                if (!bank_account || !ifsc) {{ alert("Fill all bank details"); return; }}
+
                 let res = await fetch('/api/save-bank', {{
                     method: 'POST',
                     headers: {{ 'Content-Type': 'application/json' }},
                     body: JSON.stringify({{ telegram_id: telegramId, bank_account: bank_account, ifsc: ifsc }})
                 }});
                 let data = await res.json();
-                if (data.success) {{ alert("Bank details updated!"); }}
+                if (data.success) {{ alert("Bank details updated successfully!"); }}
             }}
 
             async function withdraw() {{
                 let amount = parseFloat(document.getElementById('withdrawAmountInput').value);
+                if (!amount || amount <= 0) {{ alert("Enter a valid withdrawal amount"); return; }}
+
                 let res = await fetch('/api/withdraw', {{
                     method: 'POST',
                     headers: {{ 'Content-Type': 'application/json' }},
