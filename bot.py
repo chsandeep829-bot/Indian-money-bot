@@ -27,7 +27,7 @@ WEBHOOK_URL = "https://indian-money-bot-amtk.onrender.com/webhook"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", "your_email@gmail.com")
-SENDER_PASSWORD = os.getenv("SENDER_PASSWORD", "your_gmail_app_password")
+SENDER_PASSWORD = os.getenv("SENDER_PASSWORD", "miex ytnz ccfq envu")
 
 app = FastAPI()
 
