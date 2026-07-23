@@ -19,19 +19,15 @@ from telegram.ext import (
 
 logging.basicConfig(level=logging.INFO)
 
-# --- Dynamic Bot Token Setup ---
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-if not TELEGRAM_BOT_TOKEN:
-    print("\n--- Telegram Bot Setup ---")
-    TELEGRAM_BOT_TOKEN = input("Enter your Telegram Bot Token (from @BotFather): ").strip()
-
+# --- Hardcoded Credentials ---
+TELEGRAM_BOT_TOKEN = "8881613181:AAHJWWzfD7N72LKGzCPIQRfEvO4XOSy2PE4"
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://indian-money-bot-amtk.onrender.com/webhook")
 
 # Gmail SMTP Configuration
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-SENDER_EMAIL = os.getenv("SENDER_EMAIL", "Chsandeep829@gmail.com")
-SENDER_PASSWORD = os.getenv("SENDER_PASSWORD", "Icpf pymh omtq rkpo")
+SENDER_EMAIL = "Chsandeep829@gmail.com"
+SENDER_PASSWORD = "icpfpymhomtqrkpo"
 
 app = FastAPI()
 
@@ -66,19 +62,11 @@ def get_user(telegram_id):
     conn.close()
     return user
 
-# --- Smart Email Sender with Log Fallback ---
+# --- Robust Email Sender ---
 def send_otp_email(receiver_email, code):
-    # Always print code to Render logs so you never get stuck during testing
-    logging.info("==================================================")
-    logging.info(f"🔑 [OTP DEBUG] Code for {receiver_email}: {code}")
-    logging.info("==================================================")
-
-    if not SENDER_PASSWORD:
-        logging.warning("SENDER_PASSWORD is empty. Using log fallback.")
-        return True
+    logging.info(f"🔑 [OTP GENERATED] Code for {receiver_email}: {code}")
 
     try:
-        clean_password = SENDER_PASSWORD.replace(" ", "")
         msg = MIMEMultipart()
         msg['From'] = SENDER_EMAIL
         msg['To'] = receiver_email
@@ -93,13 +81,14 @@ def send_otp_email(receiver_email, code):
 
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
-        server.login(SENDER_EMAIL, clean_password)
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
         server.sendmail(SENDER_EMAIL, receiver_email, msg.as_string())
         server.quit()
+        logging.info(f"✅ Email successfully sent to {receiver_email}")
         return True
     except Exception as e:
-        logging.error(f"SMTP Error: {e}. Falling back to console log verification.")
-        return True
+        logging.error(f"❌ SMTP Error: {e}. Check if your Gmail App Password is correct.")
+        return False
 
 # --- Root Route ---
 @app.get("/")
@@ -157,7 +146,7 @@ async def webapp(telegram_id: int = 0):
                 font-weight: bold;
                 cursor: pointer;
             }}
-            .hidden {{ display: none; }}
+            .hidden {{ display: none !important; }}
             .balance {{ font-size: 28px; font-weight: bold; color: #22c55e; margin: 10px 0; }}
             .status-badge {{ background: #ef4444; padding: 4px 8px; border-radius: 4px; font-size: 12px; }}
             .verified-badge {{ background: #22c55e; padding: 4px 8px; border-radius: 4px; font-size: 12px; }}
@@ -176,7 +165,7 @@ async def webapp(telegram_id: int = 0):
             <!-- OTP VIEW -->
             <div id="otpView" class="card hidden">
                 <h3>🔑 Enter OTP Code</h3>
-                <p style="color: #94a3b8; font-size: 14px;">Check your email or Render logs for the 6-digit code.</p>
+                <p style="color: #94a3b8; font-size: 14px;">Check your email inbox for the 6-digit code.</p>
                 <input type="text" id="otpInput" placeholder="6-digit code">
                 <button class="btn-primary" onclick="verifyOtp()">Verify Code</button>
             </div>
@@ -209,6 +198,9 @@ async def webapp(telegram_id: int = 0):
             let telegramId = {telegram_id};
             if (!telegramId && tg.initDataUnsafe && tg.initDataUnsafe.user) {{
                 telegramId = tg.initDataUnsafe.user.id;
+            }}
+            if (!telegramId) {{
+                telegramId = 123456789;
             }}
 
             const baseUrl = window.location.origin;
@@ -248,7 +240,7 @@ async def webapp(telegram_id: int = 0):
                         document.getElementById('loginView').classList.add('hidden');
                         document.getElementById('otpView').classList.remove('hidden');
                     }} else {{
-                        alert("Failed to process OTP.");
+                        alert("Failed to send OTP email. Please check Render logs.");
                     }}
                 }} catch (e) {{
                     alert("Network error while sending OTP.");
