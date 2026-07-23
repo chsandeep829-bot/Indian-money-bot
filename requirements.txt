@@ -1,5 +1,4 @@
 fastapi
 uvicorn
-requests
-razorpay
 python-telegram-bot
+requests
