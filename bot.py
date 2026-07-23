@@ -23,11 +23,12 @@ logging.basicConfig(level=logging.INFO)
 TELEGRAM_BOT_TOKEN = "8881613181:AAHJWWzfD7N72LKGzCPIQRfEvO4XOSy2PE4"
 WEBHOOK_URL = "https://indian-money-bot-amtk.onrender.com/webhook"
 
-# Gmail SMTP Configuration (Can use environment variables or set directly)
+# Gmail SMTP Configuration
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-SENDER_EMAIL = os.getenv("SENDER_EMAIL", "your_email@gmail.com")
-SENDER_PASSWORD = os.getenv("SENDER_PASSWORD", "miex ytnz ccfq envu")
+# Make sure to replace these with your actual Gmail address and 16-character App Password
+SENDER_EMAIL = os.getenv("SENDER_EMAIL", "Chsandeep829@gmail.com")
+SENDER_PASSWORD = os.getenv("SENDER_PASSWORD", "your_gmail_app_password")
 
 app = FastAPI()
 
@@ -159,7 +160,7 @@ async def receive_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
     success = send_otp_email(email, code)
     
     if not success:
-        await update.message.reply_text("❌ Failed to send email. Please check your SMTP credentials or email address.")
+        await update.message.reply_text("❌ Failed to send email. Please check your Gmail App Password configuration on Render logs.")
         return ConversationHandler.END
 
     conn = sqlite3.connect("bot_database.db")
