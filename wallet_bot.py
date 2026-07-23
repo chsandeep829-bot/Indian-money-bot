@@ -14,7 +14,7 @@ from telegram.ext import (
 
 logging.basicConfig(level=logging.INFO)
 
-TELEGRAM_BOT_TOKEN = "8881613181:AAFPReg9L7CeUb5ApUaU0oHoY4wN0rEX3fI"
+TELEGRAM_BOT_TOKEN = "YOUR_CLIENT_DEVELOPER_BOT_TOKEN_HERE"
 
 # Conversation States
 EMAIL, CODE, BANK_ACC, BANK_IFSC, WITHDRAW_AMOUNT = range(5)
@@ -29,7 +29,7 @@ def init_db():
             email TEXT,
             confirmation_code TEXT,
             is_verified INTEGER DEFAULT 0,
-            balance REAL DEFAULT 100.0,  # Starting with ₹100 bonus for testing
+            balance REAL DEFAULT 100.0,
             bank_account TEXT,
             ifsc TEXT
         )
@@ -53,7 +53,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user = get_user(user_id)
 
-    # Register user if not exists
     if not user:
         conn = sqlite3.connect("wallet_bot.db")
         cursor = conn.cursor()
@@ -66,10 +65,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not is_verified:
         keyboard = [[InlineKeyboardButton("🔐 Login with Google / Email", callback_data="start_login")]]
-        await update.message.reply_text(
-            "Welcome! To use your wallet and withdraw money, please verify your account.",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        if update.message:
+            await update.message.reply_text(
+                "Welcome! To use your wallet and withdraw money, please verify your account.",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
     else:
         await show_wallet_menu(update, context)
 
@@ -97,7 +97,7 @@ async def show_wallet_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if update.callback_query:
         await update.callback_query.message.edit_text(text, reply_markup=reply_markup, parse_mode="Markdown")
-    else:
+    elif update.message:
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
 
 # --- Login & Confirmation Code Flow ---
@@ -112,7 +112,6 @@ async def receive_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
     email = update.message.text.strip()
     user_id = update.effective_user.id
 
-    # Generate 6-digit confirmation code
     code = str(random.randint(100000, 999999))
 
     conn = sqlite3.connect("wallet_bot.db")
@@ -121,16 +120,15 @@ async def receive_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
     conn.close()
 
-    # In production, send this code via email service (SMTP/SendGrid). For demo, we log/print it:
     print(f"\n[DEBUG] Confirmation Code for {email}: {code}\n")
 
     await update.message.reply_text(
-        f"📧 A confirmation code has been sent to **{email}**.\n*(Check server console for demo code)*\n\nPlease enter the 6-digit code:",
+        f"📧 A confirmation code has been sent to **{email}**.\n*(Check server/terminal console for demo code)*\n\nPlease enter the 6-digit code:",
         parse_mode="Markdown"
     )
     return CODE
 
-async verify_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def verify_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     entered_code = update.message.text.strip()
     user_id = update.effective_user.id
 
@@ -176,10 +174,7 @@ async def receive_ifsc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.close()
 
     await update.message.reply_text("✅ Bank account successfully linked!")
-    
-    # Render main wallet menu
-    fake_update = Update(update.update_id, message=update.message)
-    await show_wallet_menu(fake_update, context)
+    await show_wallet_menu(update, context)
     return ConversationHandler.END
 
 # --- Withdrawal Flow ---
@@ -222,7 +217,6 @@ async def process_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text(f"❌ Insufficient balance. Your available balance is ₹{balance:.2f}.")
         return WITHDRAW_AMOUNT
 
-    # Deduct balance and process withdrawal
     new_balance = balance - amount
     conn = sqlite3.connect("wallet_bot.db")
     cursor = conn.cursor()
@@ -237,8 +231,7 @@ async def process_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE)
         parse_mode="Markdown"
     )
     
-    fake_update = Update(update.update_id, message=update.message)
-    await show_wallet_menu(fake_update, context)
+    await show_wallet_menu(update, context)
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -250,7 +243,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if __name__ == "__main__":
     application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
-    # Login Conversation Handler
     login_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(start_login, pattern="^start_login$")],
         states={
@@ -260,7 +252,6 @@ if __name__ == "__main__":
         fallbacks=[CommandHandler("cancel", cancel)]
     )
 
-    # Bank Setup Conversation Handler
     bank_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(start_add_bank, pattern="^add_bank$")],
         states={
@@ -270,7 +261,6 @@ if __name__ == "__main__":
         fallbacks=[CommandHandler("cancel", cancel)]
     )
 
-    # Withdrawal Conversation Handler
     withdraw_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(start_withdrawal, pattern="^withdraw_money$")],
         states={
