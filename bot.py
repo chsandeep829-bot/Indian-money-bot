@@ -17,8 +17,9 @@ from telegram.ext import (
 
 logging.basicConfig(level=logging.INFO)
 
-TELEGRAM_BOT_TOKEN = os.getenv("8881613181:AAHJWWzfD7N72LKGzCPIQRfEvO4XOSy2PE4")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://indian-money-bot-amtk.onrender.com/webhook")
+# Hardcoded token to prevent environment variable reading issues on Render
+TELEGRAM_BOT_TOKEN = "8881613181:AAHJWWzfD7N72LKGzCPIQRfEvO4XOSy2PE4"
+WEBHOOK_URL = "https://indian-money-bot-amtk.onrender.com/webhook"
 
 app = FastAPI()
 
