@@ -2,6 +2,9 @@ import os
 import sqlite3
 import random
 import logging
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from fastapi import FastAPI, Request
 import uvicorn
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -17,9 +20,14 @@ from telegram.ext import (
 
 logging.basicConfig(level=logging.INFO)
 
-# Hardcoded token to prevent environment variable reading issues on Render
 TELEGRAM_BOT_TOKEN = "8881613181:AAHJWWzfD7N72LKGzCPIQRfEvO4XOSy2PE4"
 WEBHOOK_URL = "https://indian-money-bot-amtk.onrender.com/webhook"
+
+# Gmail SMTP Configuration (Can use environment variables or set directly)
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+SENDER_EMAIL = os.getenv("SENDER_EMAIL", "your_email@gmail.com")
+SENDER_PASSWORD = os.getenv("SENDER_PASSWORD", "your_gmail_app_password")
 
 app = FastAPI()
 
@@ -56,6 +64,32 @@ def get_user(telegram_id):
     user = cursor.fetchone()
     conn.close()
     return user
+
+# --- Real Email Sender Function ---
+def send_otp_email(receiver_email, code):
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = SENDER_EMAIL
+        msg['To'] = receiver_email
+        msg['Subject'] = "🔐 Your Wallet Verification Code"
+
+        body = (
+            f"Hello,\n\n"
+            f"Your 6-digit confirmation code for your secure wallet login is: {code}\n\n"
+            f"Please enter this code in the Telegram bot to verify your account.\n"
+            f"If you did not request this, please ignore this email."
+        )
+        msg.attach(MIMEText(body, 'plain'))
+
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        server.sendmail(SENDER_EMAIL, receiver_email, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        logging.error(f"Failed to send email: {e}")
+        return False
 
 # --- Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -112,7 +146,7 @@ async def show_wallet_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def start_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.message.reply_text("Please enter your email address (Google Account email) to receive a confirmation code:")
+    await query.message.reply_text("Please enter your email address (Google Account email) to receive a real confirmation code:")
     return EMAIL
 
 async def receive_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -121,16 +155,21 @@ async def receive_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     code = str(random.randint(100000, 999999))
 
+    # Send real email via Gmail SMTP
+    success = send_otp_email(email, code)
+    
+    if not success:
+        await update.message.reply_text("❌ Failed to send email. Please check your SMTP credentials or email address.")
+        return ConversationHandler.END
+
     conn = sqlite3.connect("bot_database.db")
     cursor = conn.cursor()
     cursor.execute("UPDATE users SET email = ?, confirmation_code = ? WHERE telegram_id = ?", (email, code, user_id))
     conn.commit()
     conn.close()
 
-    print(f"\n[DEBUG] Confirmation Code for {email}: {code}\n")
-
     await update.message.reply_text(
-        f"📧 A confirmation code has been sent to **{email}**.\n*(Check server/render logs for demo code)*\n\nPlease enter the 6-digit code:",
+        f"📧 A real confirmation code has been sent to **{email}**.\n\nPlease check your inbox/spam folder and enter the 6-digit code:",
         parse_mode="Markdown"
     )
     return CODE
