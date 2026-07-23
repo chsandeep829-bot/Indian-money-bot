@@ -26,7 +26,6 @@ WEBHOOK_URL = "https://indian-money-bot-amtk.onrender.com/webhook"
 # Gmail SMTP Configuration
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-# Make sure to replace these with your actual Gmail address and 16-character App Password
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", "Chsandeep829@gmail.com")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD", "your_gmail_app_password")
 
@@ -92,51 +91,47 @@ def send_otp_email(receiver_email, code):
         logging.error(f"Failed to send email: {e}")
         return False
 
-# --- Handlers ---
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# --- Main Dashboard UI ---
+async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user = get_user(user_id)
 
     if not user:
         conn = sqlite3.connect("bot_database.db")
         cursor = conn.cursor()
-        cursor.execute("INSERT OR IGNORE INTO users (telegram_id, balance) VALUES (?, ?)", (user_id, 0.0))
+        cursor.execute("INSERT OR IGNORE INTO users (telegram_id, balance) VALUES (?, ?)", (user_id, 100.0))
         conn.commit()
         conn.close()
         user = get_user(user_id)
 
     is_verified = user[1]
-
-    if not is_verified:
-        keyboard = [[InlineKeyboardButton("🔐 Login with Google / Email", callback_data="start_login")]]
-        if update.message:
-            await update.message.reply_text(
-                "Welcome! To use your wallet and withdraw money, please verify your account.",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-    else:
-        await show_wallet_menu(update, context)
-
-async def show_wallet_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    user = get_user(user_id)
     balance = user[2]
     bank = user[3] or "Not Linked"
-    ifsc = user[4] or "Not Linked"
 
-    text = (
-        f"💼 **Your Secure Wallet**\n\n"
-        f"💰 **Available Balance:** ₹{balance:.2f}\n"
-        f"🏦 **Bank Account:** {bank}\n"
-        f"🔤 **IFSC Code:** {ifsc}\n\n"
-        f"Select an option below:"
-    )
+    if not is_verified:
+        text = (
+            f"🇮🇳 **Indian Payments Bot**\n\n"
+            f"Buy, sell, store, and manage your INR wallet seamlessly.\n\n"
+            f"⚠️ **Account Status:** Unverified\n"
+            f"Please verify your email address to unlock your wallet."
+        )
+        keyboard = [
+            [InlineKeyboardButton("🔐 Verify Account", callback_data="start_login")],
+            [InlineKeyboardButton("⚙️ Settings", callback_data="settings")]
+        ]
+    else:
+        text = (
+            f"🇮🇳 **Indian Payments Wallet**\n\n"
+            f"₹ **{balance:.2f}**\n"
+            f"Total balance in INR\n\n"
+            f"🏦 **Bank:** {bank}"
+        )
+        keyboard = [
+            [InlineKeyboardButton("💼 Wallet", callback_data="wallet_menu"), InlineKeyboardButton("💸 Withdraw", callback_data="withdraw_money")],
+            [InlineKeyboardButton("📥 Add/Update Bank", callback_data="add_bank"), InlineKeyboardButton("📜 History", callback_data="history")],
+            [InlineKeyboardButton("⚙️ Settings", callback_data="settings"), InlineKeyboardButton("🔄 Refresh", callback_data="refresh_wallet")]
+        ]
 
-    keyboard = [
-        [InlineKeyboardButton("📥 Add Bank Account", callback_data="add_bank")],
-        [InlineKeyboardButton("💸 Withdraw Money", callback_data="withdraw_money")],
-        [InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="refresh_wallet")]
-    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     if update.callback_query:
@@ -144,6 +139,47 @@ async def show_wallet_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif update.message:
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
 
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await show_main_menu(update, context)
+
+async def wallet_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await show_main_menu(update, context)
+
+async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.effective_user.id
+    user = get_user(user_id)
+    
+    email = user[0] or "Not Linked"
+    verified = "✅ Verified" if user[1] else "❌ Unverified"
+
+    text = (
+        f"⚙️ **Account Settings**\n\n"
+        f"📧 **Email:** {email}\n"
+        f"🔒 **Status:** {verified}\n\n"
+        f"Manage your account preferences below:"
+    )
+    keyboard = [
+        [InlineKeyboardButton("🔐 Re-verify / Change Email", callback_data="start_login")],
+        [InlineKeyboardButton("🔙 Back to Main Menu", callback_data="main_menu")]
+    ]
+    await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+
+async def history_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    text = (
+        f"📜 **Transaction History**\n\n"
+        f"• Welcome Bonus: +₹100.00 (Completed)\n"
+        f"No other recent transactions."
+    )
+    keyboard = [[InlineKeyboardButton("🔙 Back to Main Menu", callback_data="main_menu")]]
+    await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+
+# --- Login Conversation ---
 async def start_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -155,12 +191,10 @@ async def receive_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     code = str(random.randint(100000, 999999))
-
-    # Send real email via Gmail SMTP
     success = send_otp_email(email, code)
     
     if not success:
-        await update.message.reply_text("❌ Failed to send email. Please check your Gmail App Password configuration on Render logs.")
+        await update.message.reply_text("❌ Failed to send email. Please check your Gmail App Password configuration on Render.")
         return ConversationHandler.END
 
     conn = sqlite3.connect("bot_database.db")
@@ -189,13 +223,14 @@ async def verify_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.commit()
         conn.close()
         await update.message.reply_text("✅ Login successful! Your account is verified.")
-        await show_wallet_menu(update, context)
+        await show_main_menu(update, context)
         return ConversationHandler.END
     else:
         conn.close()
         await update.message.reply_text("❌ Invalid code. Please enter the correct 6-digit confirmation code:")
         return CODE
 
+# --- Bank & Withdrawal Conversations ---
 async def start_add_bank(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -219,7 +254,7 @@ async def receive_ifsc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.close()
 
     await update.message.reply_text("✅ Bank account successfully linked!")
-    await show_wallet_menu(update, context)
+    await show_main_menu(update, context)
     return ConversationHandler.END
 
 async def start_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -274,7 +309,7 @@ async def process_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE)
         parse_mode="Markdown"
     )
     
-    await show_wallet_menu(update, context)
+    await show_main_menu(update, context)
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -309,7 +344,11 @@ withdraw_conv = ConversationHandler(
 )
 
 telegram_app.add_handler(CommandHandler("start", start))
-telegram_app.add_handler(CallbackQueryHandler(show_wallet_menu, pattern="^refresh_wallet$"))
+telegram_app.add_handler(CallbackQueryHandler(show_main_menu, pattern="^main_menu$"))
+telegram_app.add_handler(CallbackQueryHandler(wallet_menu, pattern="^wallet_menu$"))
+telegram_app.add_handler(CallbackQueryHandler(show_main_menu, pattern="^refresh_wallet$"))
+telegram_app.add_handler(CallbackQueryHandler(settings_menu, pattern="^settings$"))
+telegram_app.add_handler(CallbackQueryHandler(history_menu, pattern="^history$"))
 telegram_app.add_handler(login_conv)
 telegram_app.add_handler(bank_conv)
 telegram_app.add_handler(withdraw_conv)
