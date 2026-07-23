@@ -69,9 +69,9 @@ def get_user(telegram_id):
 # --- Smart Email Sender with Log Fallback ---
 def send_otp_email(receiver_email, code):
     # Always print code to Render logs so you never get stuck during testing
-    logging.info(==================================================)
+    logging.info("==================================================")
     logging.info(f"🔑 [OTP DEBUG] Code for {receiver_email}: {code}")
-    logging.info(==================================================)
+    logging.info("==================================================")
 
     if not SENDER_PASSWORD:
         logging.warning("SENDER_PASSWORD is empty. Using log fallback.")
@@ -99,7 +99,6 @@ def send_otp_email(receiver_email, code):
         return True
     except Exception as e:
         logging.error(f"SMTP Error: {e}. Falling back to console log verification.")
-        # Returns True so the UI proceeds to the OTP screen, allowing you to grab the code from Render logs
         return True
 
 # --- Root Route ---
