@@ -62,9 +62,11 @@ def get_user(telegram_id):
     conn.close()
     return user
 
-# --- Robust Email Sender ---
+# --- Robust Email Sender with Fallback ---
 def send_otp_email(receiver_email, code):
+    logging.info("==================================================")
     logging.info(f"🔑 [OTP GENERATED] Code for {receiver_email}: {code}")
+    logging.info("==================================================")
 
     try:
         msg = MIMEMultipart()
@@ -79,16 +81,14 @@ def send_otp_email(receiver_email, code):
         )
         msg.attach(MIMEText(body, 'plain'))
 
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=5)
         server.starttls()
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
         server.sendmail(SENDER_EMAIL, receiver_email, msg.as_string())
         server.quit()
         logging.info(f"✅ Email successfully sent to {receiver_email}")
-        return True
     except Exception as e:
-        logging.error(f"❌ SMTP Error: {e}. Check if your Gmail App Password is correct.")
-        return False
+        logging.warning(f"⚠️ SMTP Notice: {e}. Code is available in Render logs above.")
 
 # --- Root Route ---
 @app.get("/")
@@ -165,7 +165,7 @@ async def webapp(telegram_id: int = 0):
             <!-- OTP VIEW -->
             <div id="otpView" class="card hidden">
                 <h3>🔑 Enter OTP Code</h3>
-                <p style="color: #94a3b8; font-size: 14px;">Check your email inbox for the 6-digit code.</p>
+                <p style="color: #94a3b8; font-size: 14px;">Check your Render logs for the 6-digit code.</p>
                 <input type="text" id="otpInput" placeholder="6-digit code">
                 <button class="btn-primary" onclick="verifyOtp()">Verify Code</button>
             </div>
@@ -240,7 +240,7 @@ async def webapp(telegram_id: int = 0):
                         document.getElementById('loginView').classList.add('hidden');
                         document.getElementById('otpView').classList.remove('hidden');
                     }} else {{
-                        alert("Failed to send OTP email. Please check Render logs.");
+                        alert("Failed to process OTP.");
                     }}
                 }} catch (e) {{
                     alert("Network error while sending OTP.");
@@ -333,15 +333,15 @@ async def api_send_otp(request: Request):
     email = data.get("email")
     code = str(random.randint(100000, 999999))
 
-    success = send_otp_email(email, code)
-    if success:
-        conn = sqlite3.connect("bot_database.db", check_same_thread=False)
-        cursor = conn.cursor()
-        cursor.execute("UPDATE users SET email = ?, confirmation_code = ? WHERE telegram_id = ?", (email, code, telegram_id))
-        conn.commit()
-        conn.close()
-        return {"success": True}
-    return {"success": False}
+    # Always generate and save code, then return success immediately
+    send_otp_email(email, code)
+    
+    conn = sqlite3.connect("bot_database.db", check_same_thread=False)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET email = ?, confirmation_code = ? WHERE telegram_id = ?", (email, code, telegram_id))
+    conn.commit()
+    conn.close()
+    return {"success": True}
 
 @app.post("/api/verify-otp")
 async def api_verify_otp(request: Request):
