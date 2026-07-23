@@ -93,6 +93,11 @@ def send_otp_email(receiver_email, code):
         logging.error(f"Failed to send email: {e}")
         return False
 
+# --- Root Route to Prevent Render 404 Health Check Errors ---
+@app.get("/")
+async def root():
+    return {"status": "online", "message": "Indian Payments Bot is running successfully!"}
+
 # --- Full Web App Frontend (HTML/CSS/JS) ---
 @app.get("/webapp", response_class=HTMLResponse)
 async def webapp(telegram_id: int = 0):
